@@ -17,6 +17,7 @@ import (
 type StringService interface {
 	Uppercase(string) (string, error)
 	Count(string) int
+	Reverse(string) (string, error)
 }
 
 type stringService struct{}
@@ -30,6 +31,18 @@ func (stringService) Uppercase(s string) (string, error) {
 
 func (stringService) Count(s string) int {
 	return len(s)
+}
+
+func (stringService) Reverse(s string) (string, error) {
+	if s == "" {
+		return "", ErrEmpty
+	}
+
+	r := []rune(s)
+	for i, j := 0, len(r) - 1; i < len(r) / 2; i, j = i + 1, j - 1 {
+		r[i], r[j] = r[j], r[i]
+	}
+	return string(r), nil
 }
 
 func main() {
@@ -50,8 +63,16 @@ func main() {
 		encodeResponse,
 	)
 
+	reverseHandler := httptransport.NewServer(
+		ctx,
+		makeReverseEndpoint(svc),
+		decodeReverseRequest,
+		encodeResponse,
+	)
+
 	http.Handle("/uppercase", uppercaseHandler)
 	http.Handle("/count", countHandler)
+	http.Handle("/reverse", reverseHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -74,6 +95,17 @@ func makeCountEndpoint(svc StringService) endpoint.Endpoint {
 	}
 }
 
+func makeReverseEndpoint(svc StringService) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req := request.(reverseRequest)
+		v, err := svc.Reverse(req.S)
+		if err != nil {
+			return uppercaseResponse{v, err.Error()}, nil
+		}
+		return uppercaseResponse{v, ""}, nil
+	}
+}
+
 func decodeUppercaseRequest(r *http.Request) (interface{}, error) {
 	var request uppercaseRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -84,6 +116,14 @@ func decodeUppercaseRequest(r *http.Request) (interface{}, error) {
 
 func decodeCountRequest(r *http.Request) (interface{}, error) {
 	var request countRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		return nil, err
+	}
+	return request, nil
+}
+
+func decodeReverseRequest(r *http.Request) (interface{}, error) {
+	var request reverseRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		return nil, err
 	}
@@ -109,6 +149,15 @@ type countRequest struct {
 
 type countResponse struct {
 	V int `json:"v"`
+}
+
+type reverseRequest struct {
+	S string `json:"s"`
+}
+
+type reverseResponse struct {
+	V   string `json:"v"`
+	Err string `json:"err,omitempty"` // errors don't define JSON marshaling
 }
 
 // ErrEmpty is returned when an input string is empty.
