@@ -18,6 +18,7 @@ type StringService interface {
 	Uppercase(string) (string, error)
 	Count(string) int
 	Reverse(string) (string, error)
+	Truncate(string, int) (string, error)
 }
 
 type stringService struct{}
@@ -45,6 +46,16 @@ func (stringService) Reverse(s string) (string, error) {
 	return string(r), nil
 }
 
+func (stringService) Truncate(s string, l int) (string, error) {
+	if s == "" {
+		return "", ErrEmpty
+	}
+
+	//todo - l error checking
+
+	return s[:l], nil
+}
+
 func main() {
 	ctx := context.Background()
 	svc := stringService{}
@@ -70,9 +81,17 @@ func main() {
 		encodeResponse,
 	)
 
+	truncateHandler := httptransport.NewServer(
+		ctx,
+		makeTruncateEndpoint(svc),
+		decodeTruncateRequest,
+		encodeResponse,
+	)
+
 	http.Handle("/uppercase", uppercaseHandler)
 	http.Handle("/count", countHandler)
 	http.Handle("/reverse", reverseHandler)
+	http.Handle("/truncate", truncateHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -106,6 +125,17 @@ func makeReverseEndpoint(svc StringService) endpoint.Endpoint {
 	}
 }
 
+func makeTruncateEndpoint(svc StringService) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req := request.(truncateRequest)
+		v, err := svc.Truncate(req.S, req.L)
+		if err != nil {
+			return truncateResponse{v, err.Error()}, nil
+		}
+		return truncateResponse{v, ""}, nil
+	}
+}
+
 func decodeUppercaseRequest(r *http.Request) (interface{}, error) {
 	var request uppercaseRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -124,6 +154,14 @@ func decodeCountRequest(r *http.Request) (interface{}, error) {
 
 func decodeReverseRequest(r *http.Request) (interface{}, error) {
 	var request reverseRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		return nil, err
+	}
+	return request, nil
+}
+
+func decodeTruncateRequest(r *http.Request) (interface{}, error) {
+	var request truncateRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		return nil, err
 	}
@@ -156,6 +194,17 @@ type reverseRequest struct {
 }
 
 type reverseResponse struct {
+	V   string `json:"v"`
+	Err string `json:"err,omitempty"` // errors don't define JSON marshaling
+}
+
+
+type truncateRequest struct {
+	S string `json:"s"`
+	L int `json:"l"`
+}
+
+type truncateResponse struct {
 	V   string `json:"v"`
 	Err string `json:"err,omitempty"` // errors don't define JSON marshaling
 }
