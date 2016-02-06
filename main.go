@@ -97,7 +97,7 @@ func main() {
 
 func makeUppercaseEndpoint(svc StringService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		req := request.(uppercaseRequest)
+		req := request.(stringRequest)
 		v, err := svc.Uppercase(req.S)
 		if err != nil {
 			return uppercaseResponse{v, err.Error()}, nil
@@ -108,7 +108,7 @@ func makeUppercaseEndpoint(svc StringService) endpoint.Endpoint {
 
 func makeCountEndpoint(svc StringService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		req := request.(countRequest)
+		req := request.(stringRequest)
 		v := svc.Count(req.S)
 		return countResponse{v}, nil
 	}
@@ -116,7 +116,7 @@ func makeCountEndpoint(svc StringService) endpoint.Endpoint {
 
 func makeReverseEndpoint(svc StringService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		req := request.(reverseRequest)
+		req := request.(stringRequest)
 		v, err := svc.Reverse(req.S)
 		if err != nil {
 			return uppercaseResponse{v, err.Error()}, nil
@@ -136,8 +136,8 @@ func makeTruncateEndpoint(svc StringService) endpoint.Endpoint {
 	}
 }
 
-func decodeUppercaseRequest(r *http.Request) (interface{}, error) {
-	var request uppercaseRequest
+func decodeUppercaseRequest(r *http.Request, clazz interface{}) (interface{}, error) {
+	var request stringRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func decodeUppercaseRequest(r *http.Request) (interface{}, error) {
 }
 
 func decodeCountRequest(r *http.Request) (interface{}, error) {
-	var request countRequest
+	var request stringRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func decodeCountRequest(r *http.Request) (interface{}, error) {
 }
 
 func decodeReverseRequest(r *http.Request) (interface{}, error) {
-	var request reverseRequest
+	var request stringRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func encodeResponse(w http.ResponseWriter, response interface{}) error {
 	return json.NewEncoder(w).Encode(response)
 }
 
-type uppercaseRequest struct {
+type stringRequest struct {
 	S string `json:"s"`
 }
 
@@ -181,23 +181,14 @@ type uppercaseResponse struct {
 	Err string `json:"err,omitempty"` // errors don't define JSON marshaling
 }
 
-type countRequest struct {
-	S string `json:"s"`
-}
-
 type countResponse struct {
 	V int `json:"v"`
-}
-
-type reverseRequest struct {
-	S string `json:"s"`
 }
 
 type reverseResponse struct {
 	V   string `json:"v"`
 	Err string `json:"err,omitempty"` // errors don't define JSON marshaling
 }
-
 
 type truncateRequest struct {
 	S string `json:"s"`
